@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16  # Vi låser den til version 16, så den er stabil
+    environment:
+      - POSTGRES_PASSWORD=hemmeligt
+      - POSTGRES_DB=hundedb
+      - PGDATA=/var/lib/postgresql/data/pgdata  # <-- HER ER FIXET!
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./setup.sql:/docker-entrypoint-initdb.d/setup.sql
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_CONNECTION_STRING=Host=db;Username=postgres;Password=hemmeligt;Database=hundedb
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
