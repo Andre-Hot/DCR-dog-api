@@ -11,40 +11,58 @@ var app = builder.Build();
 
 app.MapGet("/dogs", async (NpgsqlDataSource db) =>
 {
-    
     using var conn = await db.OpenConnectionAsync();
-    
-    using var cmd = new NpgsqlCommand("SELECT name, breed, age FROM dogs", conn);
+    using var cmd = new NpgsqlCommand("SELECT id, name, breed, age FROM dogs", conn);
     using var reader = await cmd.ExecuteReaderAsync();
 
     var dogs = new List<Dog>();
     while (await reader.ReadAsync())
     {
         dogs.Add(new Dog(
-            reader.GetString(0), 
-            reader.GetString(1), 
-            reader.GetInt32(2)   
+            reader.GetInt32(0), 
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetInt32(3)   
         ));
     }
     return dogs;
 });
 
 
-app.MapPost("/dogs", async (Dog hund, NpgsqlDataSource db) =>
+app.MapPost("/dogs", async (CreateDogDto nyHund, NpgsqlDataSource db) =>
 {
     using var conn = await db.OpenConnectionAsync();
-    
-    using var cmd = new NpgsqlCommand("INSERT INTO dogs (name, breed, age) VALUES ($1, $2, $3)", conn);
-    cmd.Parameters.AddWithValue(hund.Name);
-    cmd.Parameters.AddWithValue(hund.Breed);
-    cmd.Parameters.AddWithValue(hund.Age);
-    
-    await cmd.ExecuteNonQueryAsync();
 
-    return Results.Created($"/dogs/{hund.Name}", hund);
+    using var cmd = new NpgsqlCommand("INSERT INTO dogs (name, breed, age) VALUES ($1, $2, $3) RETURNING id", conn);
+    
+    
+    cmd.Parameters.AddWithValue(nyHund.Name);
+    cmd.Parameters.AddWithValue(nyHund.Breed);
+    cmd.Parameters.AddWithValue(nyHund.Age);
+    
+    var newId = (int)await cmd.ExecuteScalarAsync();
+
+    return Results.Created($"/dogs/{newId}", new Dog(newId, nyHund.Name, nyHund.Breed, nyHund.Age));
+});
+
+
+app.MapDelete("/dogs/{id}", async (int id, NpgsqlDataSource db) =>
+{
+    using var conn = await db.OpenConnectionAsync();
+    using var cmd = new NpgsqlCommand("DELETE FROM dogs WHERE id = $1", conn);
+    cmd.Parameters.AddWithValue(id);
+    
+    var rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+    if (rowsAffected == 0)
+    {
+        return Results.NotFound($"Kunne ikke finde hund med ID {id}");
+    }
+
+    return Results.NoContent();
 });
 
 app.Run();
 
-
-public record Dog(string Name, string Breed, int Age);
+public record Dog(int Id, string Name, string Breed, int Age);
+public record CreateDogDto(string Name, string Breed, int Age);
