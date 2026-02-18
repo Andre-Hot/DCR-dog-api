@@ -1,0 +1,142 @@
+# 1. KONFIGURATION 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+data:
+  database-name: "hundedb"
+  database-user: "postgres"
+---
+# 2. HEMMELIGHEDER
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-secret
+type: Opaque
+stringData:
+  database-password: "1234"
+  connection-string: "Host=db;Port=5432;Database=hundedb;User ID=postgres;Password=1234;SslMode=Disable"
+---
+# 3. LAGERPLADS (Harddisk)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# 4. DATABASEN 
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  selector:
+    app: db
+  ports:
+    - port: 5432
+---
+# 5. DATABASEN (Deployment)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-storage
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: database-name
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: database-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: database-password
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: "trust"
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+# 6. API 
+apiVersion: v1
+kind: Service
+metadata:
+  name: dogapi-service
+spec:
+  selector:
+    app: dogapi
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+# 7. API (Deployment - Hunden)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dogapi
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dogapi
+  template:
+    metadata:
+      labels:
+        app: dogapi
+    spec:
+      containers:
+        - name: dogapi
+          image: andrewsher2026/dogapi:v1
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: connection-string
+---
+# 8. INGRESS (Dørmanden)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dogapi-ingress
+spec:
+  rules:
+    - host: dogapi.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dogapi-service
+                port:
+                  number: 80
