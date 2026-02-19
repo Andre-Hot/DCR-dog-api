@@ -1,37 +1,37 @@
-# DogApi 
-Dette er en demo-applikation, der demonstrerer en REST API bygget i .NET 8, som kører i samspil med en PostgreSQL database via Docker Compose.
+# DCR Kubernetes Blueprint (Dog API)
 
-Projektet er designet til at være "Cloud Ready" med fokus på Container arkitektur
+Dette repo er et (PoC) bygget for at demonstrere, hvordan vi kan køre et robust og sikkert .Net/PostgreSQL-miljø i Kubernetes
+Selve applikationen er et simpelt "Dog API", men strukturen i "k8s/production.yaml" fungerer som en skabelon, der kan
+genbruges til DCR's rigtige services.
 
--.Net 8 (API)
--PostgreSQL (Database med persistens via Docker volumes)
--Docker & Docker Compose
--Npgsql (Database driver med Dependency injection)
+#Arkitektur &  Best practices
+Skabelonen demonstrerer følgende koncepter sat til produktionsbrug:
 
-Sådan startes systemet:
+-Seperation of Concerns: Konfiguration ("ConfigMap") og adgangskoder/connection strings ("secret") er trukket ud af selve
+applikationen.
+-Data Persistence: Databasen benytter en Persistent Volume Claim (PVC), så data overlever pod-crashes og genstarter.
+-Self-healing:** API'en overvåges af `livenessProbe` og `readinessProbe`. Hvis applikationen fryser, genstarter Kubernetes
+den automatisk.
+-Resource Limits:** Der er sat hard-limits på RAM og CPU (requests/limits) for at forhindre, at en enkelt service med et
+et memory leak overbelaster clusteret (Kubernetes miljøet).
+-Ingress: Trafik udefra styres via en Ingress Controller, der lytter på `dogapi.local`.
+-CI/CD: En simpel GitHub Action bygger og uploader automatisk et nyt Docker-image ved hvert push til `main`.
 
-Der skal blot bruges en kommando for at starte både API'en og databasen
+#Sådan kan det køres lokalt "Minikube"
+Første forudsætning:- at Minikube og `kubectl` er installeret.
+-Du har tilføjet din Minikube IP til din hosts-fil (`/etc/hosts` på Linux/Mac eller `C:\Windows\System32\drivers\etc\hosts` på Windows):
+`192.168.49.2 dogapi.local` *(husk at tjekke din aktuelle ip med `minikube ip`)
 
-docker compose up --build
-Systemet er klar, når du ser beskeden: database system is ready to accept connections.
+Derefter start Kubernetes miljøet
+Start Minikube og åbn Ingress-tunnelen (skal køre i baggrunden):
+minikube start
+minikube tunnel
 
-Endpoints
-1. Se alle hunde (GET)
+3. Deploy infrastrukturen med denne kommando:
+kubectl apply -f k8s/production.yaml
+derefter kan man indstaste denne kommando til at følge med i pods'ne:
+kubectl get pods -w
 
-Åbn din browser eller Postman/Thunder Client: http://localhost:8080/dogs
-2. Tilføj en ny hund (POST)
-
-Send en POST request til http://localhost:8080/dogs med følgende JSON body:
-{
-  "name": "Peter",
-  "breed": "Magnum",
-  "age": 4
-}
-
-Arkitektur
-
-Projektet bruger en docker-compose.yml fil til at rejse to services:
-
-1-api: Kører på port 8080.
-
-2-db: Kører på port 5432 (intern Docker netværk) med en persistent volume, så data overlever genstart.
+4. Test
+indtast denne kommand, API rammes via en browser eller url:
+curl -H "Host: dogapi.local" http://<din-minikube-ip>/dogs 
