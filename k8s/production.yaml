@@ -1,4 +1,4 @@
-# 1. KONFIGURATION 
+# 1. KONFIGURATION (Opslagstavlen - ikke hemmeligt)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,7 +7,7 @@ data:
   database-name: "hundedb"
   database-user: "postgres"
 ---
-# 2. HEMMELIGHEDER
+# 2. HEMMELIGHEDER (Bankboksen - passwords)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -29,7 +29,7 @@ spec:
     requests:
       storage: 1Gi
 ---
-# 4. DATABASEN 
+# 4. DATABASEN (Service)
 apiVersion: v1
 kind: Service
 metadata:
@@ -84,7 +84,7 @@ spec:
           persistentVolumeClaim:
             claimName: postgres-pvc
 ---
-# 6. API 
+# 6. API (Service - Receptionen)
 apiVersion: v1
 kind: Service
 metadata:
@@ -122,6 +122,18 @@ spec:
                 secretKeyRef:
                   name: db-secret
                   key: connection-string
+          livenessProbe:
+            httpGet:
+              path: /dogs
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /dogs
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
 ---
 # 8. INGRESS (Dørmanden)
 apiVersion: networking.k8s.io/v1
