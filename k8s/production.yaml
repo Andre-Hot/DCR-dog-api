@@ -1,4 +1,4 @@
-# 1. KONFIGURATION (Opslagstavlen - ikke hemmeligt)
+# 1. KONFIGURATION (Opslagstavlen)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,7 +7,7 @@ data:
   database-name: "hundedb"
   database-user: "postgres"
 ---
-# 2. HEMMELIGHEDER (Bankboksen - passwords)
+# 2. HEMMELIGHEDER (Bankboksen)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -58,6 +58,14 @@ spec:
       containers:
         - name: postgres
           image: postgres:16
+          # -- NYT: Ressourcegrænser for Databasen --
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m" # 250m = 25% af én CPU-kerne
+            limits:
+              memory: "512Mi"
+              cpu: "500m" # Max 50% af én CPU-kerne
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: postgres-storage
@@ -116,6 +124,14 @@ spec:
       containers:
         - name: dogapi
           image: andrewsher2026/dogapi:v1
+          # -- NYT: Ressourcegrænser for API'en --
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m" # 100m = 10% af én CPU-kerne
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
           env:
             - name: ConnectionStrings__DefaultConnection
               valueFrom:
